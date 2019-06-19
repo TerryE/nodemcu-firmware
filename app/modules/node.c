@@ -77,7 +77,6 @@ static int node_deepsleep( lua_State* L )
   return 0;
 }
 
-
 #ifdef PMSLEEP_ENABLE
 #include "pm/pmSleep.h"
 
@@ -171,17 +170,10 @@ static int node_heap( lua_State* L )
   return 1;
 }
 
-extern int  lua_put_line(const char *s, size_t l);
-extern bool user_process_input(bool force);
-
 // Lua: input("string")
 static int node_input( lua_State* L ) {
-  size_t l = 0;
-  const char *s = luaL_checklstring(L, 1, &l);
-  if (lua_put_line(s, l)) {
-    NODE_DBG("Result (if any):\n");
-    user_process_input(true);
-  }
+  luaL_checkstring(L, 1);
+  lua_queueline(L, 0);
   return 0;
 }
 
@@ -315,39 +307,22 @@ static int node_compile( lua_State* L )
   return 0;
 }
 
-// Task callback handler for node.task.post()
-static task_handle_t do_node_task_handle;
-static void do_node_task (task_param_t task_fn_ref, uint8_t prio)
-{
-  lua_State* L = lua_getstate();
-  lua_rawgeti(L, LUA_REGISTRYINDEX, (int)task_fn_ref);
-  luaL_unref(L, LUA_REGISTRYINDEX, (int)task_fn_ref);
-  lua_pushinteger(L, prio);
-  lua_call(L, 1, 0);
-}
-
 // Lua: node.task.post([priority],task_cb) -- schedule a task for execution next
 static int node_task_post( lua_State* L )
 {
-  int n = 1, Ltype = lua_type(L, 1);
+  int Ltype = lua_type(L, 1), n = 1;
   unsigned priority = TASK_PRIORITY_MEDIUM;
   if (Ltype == LUA_TNUMBER) {
     priority = (unsigned) luaL_checkint(L, 1);
     luaL_argcheck(L, priority <= TASK_PRIORITY_HIGH, 1, "invalid  priority");
-    Ltype = lua_type(L, ++n);
+    n++;
+    Ltype = lua_type(L, n);
   }
-  luaL_argcheck(L, Ltype == LUA_TFUNCTION || Ltype == LUA_TLIGHTFUNCTION, n, "invalid function");
+  luaL_checkanyfunction(L, n);
+
   lua_pushvalue(L, n);
 
-  int task_fn_ref = luaL_ref(L, LUA_REGISTRYINDEX);
-
-  if (!do_node_task_handle)  // bind the task handle to do_node_task on 1st call
-    do_node_task_handle = task_get_id(do_node_task);
-
-  if(!task_post(priority, do_node_task_handle, (task_param_t)task_fn_ref)) {
-    luaL_unref(L, LUA_REGISTRYINDEX, task_fn_ref);
-    luaL_error(L, "Task queue overflow. Task not posted");
-  }
+  lua_posttask(L, priority);
   return 0;
 }
 
@@ -399,7 +374,8 @@ static int node_restore (lua_State *L)
 }
 
 #ifdef LUA_OPTIMIZE_DEBUG
-/* node.stripdebug([level[, function]]). 
+/* node.stripdebug([level[, function]]).
+
  * level:    1 don't discard debug
  *           2 discard Local and Upvalue debug info
  *           3 discard Local, Upvalue and lineno debug info.
@@ -599,7 +575,6 @@ LROT_BEGIN(pt)
   LROT_NUMENTRY( spiffs_size, spiffs_size )
 LROT_END( pt, NULL, 0 )
 
-
 // Lua: ptinfo = node.getpartitiontable()
 static int node_getpartitiontable (lua_State *L) {
   uint32_t param[max_pt] = {0};
@@ -741,7 +716,6 @@ static int node_setpartitiontable (lua_State *L) {
   return 0;
 }
 
-
 // Module function map
 
 LROT_BEGIN(node_egc)
@@ -805,6 +779,5 @@ LROT_BEGIN(node)
 // Combined to dsleep(us, option)
 //  LROT_FUNCENTRY( dsleepsetoption, node_deepsleep_setoption )
 LROT_END( node, NULL, 0 )
-
 
 NODEMCU_MODULE(NODE, "node", node, NULL);

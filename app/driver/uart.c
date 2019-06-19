@@ -27,7 +27,6 @@
 #define FUNC_U0CTS                      4
 #endif
 
-
 // For event signalling
 static task_handle_t sig = 0;
 static uint8 *sig_flag;
@@ -43,7 +42,6 @@ static void (*alt_uart0_tx)(char txchar);
 LOCAL void ICACHE_RAM_ATTR
 uart0_rx_intr_handler(void *para);
 
-
 /******************************************************************************
  * FunctionName : uart_wait_tx_empty
  * Description  : Internal used function
@@ -57,7 +55,6 @@ uart_wait_tx_empty(uint8 uart_no)
     while ((READ_PERI_REG(UART_STATUS(uart_no)) & (UART_TXFIFO_CNT<<UART_TXFIFO_CNT_S)) > 0)
         ;
 }
-
 
 /******************************************************************************
  * FunctionName : uart_config
@@ -90,7 +87,6 @@ uart_config(uint8 uart_no)
                    | ((UartDev.stop_bits & UART_STOP_BIT_NUM) << UART_STOP_BIT_NUM_S)
                    | ((UartDev.data_bits & UART_BIT_NUM) << UART_BIT_NUM_S));
 
-
     //clear rx and tx fifo,not ready
     SET_PERI_REG_MASK(UART_CONF0(uart_no), UART_RXFIFO_RST | UART_TXFIFO_RST);
     CLEAR_PERI_REG_MASK(UART_CONF0(uart_no), UART_RXFIFO_RST | UART_TXFIFO_RST);
@@ -103,8 +99,6 @@ uart_config(uint8 uart_no)
     //enable rx_interrupt
     SET_PERI_REG_MASK(UART_INT_ENA(uart_no), UART_RXFIFO_FULL_INT_ENA);
 }
-
-
 
 /******************************************************************************
  * FunctionName : uart0_alt
@@ -137,7 +131,6 @@ uart0_alt(uint8 on)
         IOSWAP &= ~(1 << IOSWAPU0);
     }
 }
-
 
 /******************************************************************************
  * FunctionName : uart_tx_one_char
@@ -298,11 +291,11 @@ uart0_rx_intr_handler(void *para)
 
         got_input = true;
     }
-
     if (got_input && sig) {
+      // Only post the handle request once the handler has fired clearing the last post
       if (isr_flag == *sig_flag) {
         isr_flag ^= 0x01;
-        task_post_low (sig, 0x8000 | isr_flag << 14 | false);
+        task_post_high (sig, isr_flag);
       }
     }
 }

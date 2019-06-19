@@ -381,22 +381,10 @@ struct lua_Debug {
 
 /* }====================================================================== */
 
-typedef struct __lua_load{
-  lua_State *L;
-  int firstline;
-  char *line;
-  int line_position;
-  size_t len;
-  int done;
-  const char *prmt;
-}lua_Load;
-
-int lua_main( int argc, char **argv );
-
-#ifndef LUA_CROSS_COMPILER
-void lua_handle_input (bool force);
-#endif
-
+int lua_main( void );
+void lua_queueline(lua_State *L, int queue);
+void lua_input_string (const char *line, int len);
+void lua_posttask(lua_State* L, int prio);
 /******************************************************************************
 * Copyright (C) 1994-2008 Lua.org, PUC-Rio.  All rights reserved.
 *
